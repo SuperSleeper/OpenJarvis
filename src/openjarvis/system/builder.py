@@ -736,7 +736,7 @@ class SystemBuilder:
         self._mcp_clients.append(client)
 
         provider = MCPToolProvider(client)
-        discovered = provider.discover()
+        discovered = provider.discover(hide_params=cfg.get("hide_params"))
 
         include_tools = set(cfg.get("include_tools", []))
         exclude_tools = set(cfg.get("exclude_tools", []))

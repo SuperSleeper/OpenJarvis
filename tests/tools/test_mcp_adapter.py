@@ -156,3 +156,50 @@ class TestMCPAdapterRoundTrip:
         provider = MCPToolProvider(client)
         tools = provider.discover()
         assert tools == []
+
+
+class TestHideParams:
+    """``hide_params`` removes filter parameters a model keeps misusing."""
+
+    def _spec(self):
+        return ToolSpec(
+            name="calculator",
+            description="Calculator",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "expression": {"type": "string"},
+                    "precision": {"type": "integer"},
+                },
+                "required": ["expression", "precision"],
+            },
+        )
+
+    def test_hidden_param_removed_from_schema(self, client):
+        adapter = MCPToolAdapter(client, self._spec(), hidden_params=["precision"])
+        assert set(adapter.spec.parameters["properties"]) == {"expression"}
+        assert adapter.spec.parameters["required"] == ["expression"]
+
+    def test_original_spec_not_mutated(self, client):
+        spec = self._spec()
+        MCPToolAdapter(client, spec, hidden_params=["precision"])
+        assert "precision" in spec.parameters["properties"]
+
+    def test_hidden_param_stripped_from_call(self, client):
+        sent = {}
+        client.call_tool = lambda name, params: (
+            sent.update(params) or {"content": [{"type": "text", "text": "ok"}]}
+        )
+        adapter = MCPToolAdapter(client, self._spec(), hidden_params=["precision"])
+        assert adapter.execute(expression="2+2", precision=3).success
+        assert sent == {"expression": "2+2"}
+
+    def test_provider_applies_hide_params_wildcard(self, client):
+        tools = MCPToolProvider(client).discover(hide_params={"calculator": "*"})
+        calc = next(t for t in tools if t.spec.name == "calculator")
+        think = next(t for t in tools if t.spec.name == "think")
+        assert calc.spec.parameters.get("properties") == {}
+        assert think.spec.parameters.get("properties")
+
+    def test_no_config_is_unchanged(self, client):
+        assert len(MCPToolProvider(client).discover()) == len(client.list_tools())

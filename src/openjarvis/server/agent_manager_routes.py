@@ -748,7 +748,7 @@ def _get_mcp_tools_locked(
             client.initialize()
 
             provider = MCPToolProvider(client)
-            discovered = provider.discover()
+            discovered = provider.discover(hide_params=cfg.get("hide_params"))
 
             # Per-server tool filtering
             include_tools = set(cfg.get("include_tools", []))
